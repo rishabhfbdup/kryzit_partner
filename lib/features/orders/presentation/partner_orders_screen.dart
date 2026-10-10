@@ -37,7 +37,10 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
           children: [
             Icon(Icons.storefront, color: AppColors.primary),
             SizedBox(width: 8),
-            Text('Kamalganj Dark Store Hub', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(
+              'Kamalganj Dark Store Hub',
+              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
           ],
         ),
         actions: const [
@@ -64,18 +67,21 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
           }
 
           final allDocs = snapshot.data?.docs ?? [];
-          
-          // Store Partner ko sirf wo orders dekhne hain jo PLACED ya STORE_PACKING hain.
-          // Packed hone ke baad wo Rider ke paas chala jata hai!
+
+          // Partner desk par active orders: Jab tak final handover ya delivery na ho
           final storeActiveDocs = allDocs.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
-            final status = data['status'] ?? '';
-            return status == 'PLACED' || status == 'STORE_PACKING';
+            final status = (data['status'] ?? '').toString().toUpperCase();
+            return status == 'PLACED' ||
+                status == 'STORE_PACKING' ||
+                status == 'RIDER_ASSIGNED' ||
+                status == 'RIDER_ARRIVED';
           }).toList();
 
           final int totalDelivered = allDocs.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
-            return data['status'] == 'DELIVERED';
+            final status = (data['status'] ?? '').toString().toUpperCase();
+            return status == 'DELIVERED' || status == 'STORE_PACKED' || status == 'HANDED_OVER';
           }).length;
 
           return SingleChildScrollView(
@@ -138,16 +144,16 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
                   children: [
                     _buildStatCard('Total Orders', '${allDocs.length}', Icons.receipt_long, Colors.blue),
                     const SizedBox(width: 8),
-                    _buildStatCard('To Pack', '${storeActiveDocs.length}', Icons.pending_actions, Colors.orange),
+                    _buildStatCard('Active Queue', '${storeActiveDocs.length}', Icons.pending_actions, Colors.orange),
                     const SizedBox(width: 8),
-                    _buildStatCard('Delivered', '$totalDelivered', Icons.check_circle_outline, Colors.green),
+                    _buildStatCard('Completed', '$totalDelivered', Icons.check_circle_outline, Colors.green),
                     const SizedBox(width: 8),
                     _buildStatCard('Live Sync', 'ON', Icons.sync, Colors.teal),
                   ],
                 ),
                 const SizedBox(height: 20),
 
-                const Text('Orders To Pack (Store Queue)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text('Store Orders Desk', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
 
                 if (storeActiveDocs.isEmpty)
@@ -164,7 +170,7 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
                         children: [
                           Icon(Icons.check_circle, color: Colors.green, size: 44),
                           SizedBox(height: 10),
-                          Text('Sabhi Orders Pack Ho Chuke Hain!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          Text('Sabhi Orders Process Ho Chuke Hain!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                           SizedBox(height: 4),
                           Text('Jaise hi Customer App se naya order aayega, yahan real-time dikhega.', style: TextStyle(fontSize: 12, color: Colors.grey)),
                         ],
@@ -176,9 +182,10 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
                     final data = doc.data() as Map<String, dynamic>;
                     final String docId = doc.id;
                     final String orderId = data['orderId'] ?? '#KZ-ORDER';
-                    final String status = data['status'] ?? 'PLACED';
+                    final String status = (data['status'] ?? 'PLACED').toString().toUpperCase();
                     final String customerName = data['customerName'] ?? 'Customer';
                     final String customerAddress = data['customerAddress'] ?? 'Kamalganj';
+                    final String riderName = data['riderName'] ?? 'Rider';
                     final double billAmount = ((data['totalAmount'] ?? 148.0) as num).toDouble();
                     final List items = (data['items'] as List?) ?? [];
 
@@ -186,7 +193,10 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
                     final double commAmount = (billAmount * commPercent) / 100;
                     final double currentPayout = billAmount - commAmount;
 
-                    final bool isPending = status == 'PLACED';
+                    final bool isPlaced = status == 'PLACED';
+                    final bool isPacking = status == 'STORE_PACKING';
+                    final bool isRiderAssigned = status == 'RIDER_ASSIGNED';
+                    final bool isRiderArrived = status == 'RIDER_ARRIVED';
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16),
@@ -195,7 +205,9 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isPending ? Colors.red : AppColors.primary,
+                          color: isPlaced
+                              ? Colors.red
+                              : (isRiderArrived ? Colors.green : AppColors.primary),
                           width: 1.5,
                         ),
                       ),
@@ -208,10 +220,10 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
                               Row(
                                 children: [
                                   CircleAvatar(
-                                    backgroundColor: isPending ? Colors.red.shade100 : Colors.green.shade100,
+                                    backgroundColor: isPlaced ? Colors.red.shade100 : Colors.green.shade100,
                                     child: Icon(
-                                      isPending ? Icons.notifications_active : Icons.shopping_bag,
-                                      color: isPending ? Colors.red : Colors.green,
+                                      isPlaced ? Icons.notifications_active : Icons.shopping_bag,
+                                      color: isPlaced ? Colors.red : Colors.green,
                                     ),
                                   ),
                                   const SizedBox(width: 10),
@@ -223,7 +235,7 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
                                         'Customer: $customerName • $customerAddress',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: isPending ? Colors.red : Colors.grey.shade600,
+                                          color: isPlaced ? Colors.red : Colors.grey.shade600,
                                         ),
                                       ),
                                     ],
@@ -233,16 +245,30 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: isPending ? Colors.red.shade50 : Colors.orange.shade50,
+                                  color: isPlaced
+                                      ? Colors.red.shade50
+                                      : (isRiderArrived ? Colors.green.shade50 : Colors.orange.shade50),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: isPending ? Colors.red : Colors.orange),
+                                  border: Border.all(
+                                    color: isPlaced
+                                        ? Colors.red
+                                        : (isRiderArrived ? Colors.green : Colors.orange),
+                                  ),
                                 ),
                                 child: Text(
-                                  isPending ? '🚨 NAYA ORDER' : 'PACKING CHALU...',
+                                  isPlaced
+                                      ? '🚨 NAYA ORDER'
+                                      : (isPacking
+                                          ? 'PACKING / FINDING RIDER'
+                                          : (isRiderAssigned
+                                              ? 'RIDER ON THE WAY'
+                                              : '🛵 RIDER AT STORE')),
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: isPending ? Colors.red : Colors.orange.shade900,
+                                    color: isPlaced
+                                        ? Colors.red
+                                        : (isRiderArrived ? Colors.green.shade900 : Colors.orange.shade900),
                                   ),
                                 ),
                               ),
@@ -301,8 +327,8 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
                           ),
                           const SizedBox(height: 14),
 
-                          // Only Store Actions
-                          if (isPending)
+                          // Action Buttons
+                          if (isPlaced)
                             SizedBox(
                               width: double.infinity,
                               height: 46,
@@ -310,18 +336,40 @@ class _PartnerOrdersScreenState extends State<PartnerOrdersScreen> {
                                 onPressed: () => _updateOrderStatus(docId, 'STORE_PACKING'),
                                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700, foregroundColor: Colors.white),
                                 icon: const Icon(Icons.check_circle_outline),
-                                label: const Text('Accept & Start Packing'),
+                                label: const Text('Accept & Request Delivery Rider'),
                               ),
                             )
-                          else
+                          else if (isPacking || isRiderAssigned)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.orange.shade200),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  isRiderAssigned
+                                      ? '🛵 $riderName is reaching store... Waiting for Arrival'
+                                      : '⌛ Pack the items. Finding nearby rider...',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: Colors.orange.shade900,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else if (isRiderArrived)
                             SizedBox(
                               width: double.infinity,
                               height: 46,
                               child: ElevatedButton.icon(
                                 onPressed: () => _updateOrderStatus(docId, 'STORE_PACKED'),
-                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-                                icon: const Icon(Icons.inventory_2),
-                                label: const Text('Mark as Packed (Handover to Rider)'),
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+                                icon: const Icon(Icons.handshake),
+                                label: Text('Handover to $riderName'),
                               ),
                             ),
                         ],
