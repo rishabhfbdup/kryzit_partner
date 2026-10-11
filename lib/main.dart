@@ -32,7 +32,7 @@ class KryzitPartnerApp extends StatelessWidget {
 }
 
 // -------------------------------------------------------------
-// 1. TRIPLE GATEWAY (Partner Login / Admin Login / New Partner Registration)
+// 1. TRIPLE GATEWAY (Partner Login / Admin Login / Register Shop)
 // -------------------------------------------------------------
 class AuthGatewayScreen extends StatefulWidget {
   const AuthGatewayScreen({super.key});
@@ -42,17 +42,15 @@ class AuthGatewayScreen extends StatefulWidget {
 }
 
 class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
-  // Modes: 0 -> Partner Login, 1 -> Admin Login, 2 -> New Partner Self-Registration
-  int _activeMode = 0;
+  int _activeMode = 0; // 0 -> Partner, 1 -> Admin, 2 -> Register Shop
 
-  // Login Controllers
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
   String _errorMessage = '';
 
-  // New Partner Self-Registration Form Controllers
+  // New Partner Registration Controllers
   final _regShopNameCtrl = TextEditingController();
   final _regOwnerNameCtrl = TextEditingController();
   final _regPhoneCtrl = TextEditingController();
@@ -96,7 +94,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
     });
 
     if (_activeMode == 1) {
-      // Admin Login
       if (inputId == superAdminId && inputPass == superAdminPass) {
         setState(() => _isLoading = false);
         if (!mounted) return;
@@ -109,7 +106,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
         return;
       }
 
-      // HR Staff check
       try {
         final hrDoc = await FirebaseFirestore.instance
             .collection('admin_staff')
@@ -141,7 +137,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
         _errorMessage = 'Galat Admin/HR ID ya Password!';
       });
     } else if (_activeMode == 0) {
-      // Partner Login
       try {
         final query = await FirebaseFirestore.instance
             .collection('partners')
@@ -204,7 +199,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
     }
   }
 
-  // Submit Self-Registration Application to Admin
   Future<void> _submitSelfOnboarding() async {
     final shop = _regShopNameCtrl.text.trim();
     final owner = _regOwnerNameCtrl.text.trim();
@@ -241,13 +235,13 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
         'ifsc': _regIfscCtrl.text.trim(),
         'upiId': _regUpiCtrl.text.trim(),
         'categories': _regSelectedCategories.toList(),
-        'status': 'PENDING', // PENDING, APPROVED, REJECTED
+        'status': 'PENDING',
         'submittedAt': FieldValue.serverTimestamp(),
       });
 
       setState(() {
         _isSubmittingReg = false;
-        _activeMode = 0; // Switch to login screen
+        _activeMode = 0;
       });
 
       if (!mounted) return;
@@ -262,7 +256,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
             ],
           ),
           content: Text(
-            'Aapki shop "$shop" ki registration request Admin ko bhej di gayi hai.\n\nAdmin details verify karke aapko Partner ID aur Password provide karenge, jiske baad aap Partner Login se login kar sakenge.',
+            'Aapki shop "$shop" ki registration request Admin ko bhej di gayi hai.\n\nAdmin details verify karke aapko Partner ID aur Password provide karenge.',
           ),
           actions: [
             ElevatedButton(
@@ -294,7 +288,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Top Brand Header
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
@@ -328,14 +321,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  _activeMode == 2
-                      ? 'Submit your store details. Approval and login credentials will be provided by Admin.'
-                      : (_activeMode == 1 ? 'Super Admin: Kryzit@9616' : 'Enter Partner ID provided upon approval'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
                 const SizedBox(height: 20),
 
                 // 3-Way Toggle Bar
@@ -349,13 +334,12 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                     children: [
                       _buildToggleButton(0, 'Partner Login'),
                       _buildToggleButton(1, 'Admin Login'),
-                      _buildToggleButton(2, 'Register New Shop'),
+                      _buildToggleButton(2, 'Register Shop'),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
 
-                // SCREEN CONTENT BASED ON ACTIVE MODE
                 if (_activeMode == 2)
                   _buildSelfOnboardingForm()
                 else
@@ -403,7 +387,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
     );
   }
 
-  // LOGIN FORM (Modes 0 and 1)
   Widget _buildLoginForm() {
     return Column(
       children: [
@@ -432,7 +415,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
             controller: _idController,
             decoration: InputDecoration(
               prefixIcon: Icon(_activeMode == 1 ? Icons.admin_panel_settings_rounded : Icons.storefront_rounded),
-              hintText: _activeMode == 1 ? 'Admin ID (Kryzit@9616)' : 'Partner ID (e.g. KZ-SHOP-101)',
+              hintText: _activeMode == 1 ? 'Admin ID (Kryzit@9616)' : 'Partner ID',
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 14),
             ),
@@ -482,129 +465,48 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
     );
   }
 
-  // NEW PARTNER SELF-ONBOARDING APPLICATION FORM (Mode 2)
   Widget _buildSelfOnboardingForm() {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('1. Store & Owner Identity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
+          const Text('Store & Owner Identity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
           const SizedBox(height: 10),
-          TextField(
-            controller: _regShopNameCtrl,
-            decoration: const InputDecoration(labelText: 'Shop / Business Name*', border: OutlineInputBorder()),
+          TextField(controller: _regShopNameCtrl, decoration: const InputDecoration(labelText: 'Shop Name*', border: OutlineInputBorder())),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: TextField(controller: _regOwnerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name*', border: OutlineInputBorder()))),
+              const SizedBox(width: 10),
+              Expanded(child: TextField(controller: _regPhoneCtrl, keyboardType: TextInputType.phone, maxLength: 10, decoration: const InputDecoration(labelText: 'Mobile*', counterText: '', border: OutlineInputBorder()))),
+            ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _regOwnerNameCtrl,
-                  decoration: const InputDecoration(labelText: 'Owner Full Name*', border: OutlineInputBorder()),
-                ),
-              ),
+              Expanded(child: TextField(controller: _regPanCtrl, decoration: const InputDecoration(labelText: 'PAN Number*', border: OutlineInputBorder()))),
               const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _regPhoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  maxLength: 10,
-                  decoration: const InputDecoration(labelText: 'Mobile Number*', counterText: '', border: OutlineInputBorder()),
-                ),
-              ),
+              Expanded(child: TextField(controller: _regFssaiCtrl, decoration: const InputDecoration(labelText: 'FSSAI License No.*', border: OutlineInputBorder()))),
             ],
           ),
           const SizedBox(height: 10),
-          TextField(
-            controller: _regEmailCtrl,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
-          ),
-          const SizedBox(height: 16),
-          const Text('2. Legal & Verification Documents', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
+          TextField(controller: _regLocationCtrl, decoration: const InputDecoration(labelText: 'Shop Location (Kamalganj Area)*', border: OutlineInputBorder())),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _regPanCtrl,
-                  decoration: const InputDecoration(labelText: 'PAN Card Number*', border: OutlineInputBorder()),
-                ),
-              ),
+              Expanded(child: TextField(controller: _regBankAccCtrl, decoration: const InputDecoration(labelText: 'Bank Account Number', border: OutlineInputBorder()))),
               const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _regFssaiCtrl,
-                  decoration: const InputDecoration(labelText: 'FSSAI License No.*', border: OutlineInputBorder()),
-                ),
-              ),
+              Expanded(child: TextField(controller: _regUpiCtrl, decoration: const InputDecoration(labelText: 'UPI ID', border: OutlineInputBorder()))),
             ],
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _regGstinCtrl,
-            decoration: const InputDecoration(labelText: 'GSTIN Number (Optional)', border: OutlineInputBorder()),
-          ),
-          const SizedBox(height: 16),
-          const Text('3. Location & Store Front', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _regLocationCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Shop Exact Address / Location (Kamalganj Area)*',
-              hintText: 'e.g. Near Railway Crossing, Bhatpura, Kamalganj',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _regPhotoCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Shop Photo Direct URL',
-              hintText: 'https://images.unsplash.com/...',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text('4. Bank Details for Payment Payouts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _regBankAccCtrl,
-            decoration: const InputDecoration(labelText: 'Bank Account Number', border: OutlineInputBorder()),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _regIfscCtrl,
-                  decoration: const InputDecoration(labelText: 'IFSC Code', border: OutlineInputBorder()),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _regUpiCtrl,
-                  decoration: const InputDecoration(labelText: 'UPI ID (GPay / PhonePe)', border: OutlineInputBorder()),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text('5. Categories You Will Sell:*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          const Text('Select Categories to Sell:*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey)),
+          const SizedBox(height: 6),
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -626,22 +528,16 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
               );
             }).toList(),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
-            height: 50,
+            height: 48,
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
               onPressed: _isSubmittingReg ? null : _submitSelfOnboarding,
               child: _isSubmittingReg
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text(
-                      'Submit Registration to Admin for Approval',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
+                  : const Text('Submit Application for Admin Approval', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -651,7 +547,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
 }
 
 // -------------------------------------------------------------
-// 2. ADMIN MASTER CONSOLE (Tabs: Approvals, Shops, Riders, Inventory, HR)
+// 2. ADMIN MASTER CONSOLE (Tabs: Approvals Hub, Shops, Riders, Inventory, HR)
 // -------------------------------------------------------------
 class AdminMasterPortalScreen extends StatefulWidget {
   final String role;
@@ -691,7 +587,7 @@ class _AdminMasterPortalScreenState extends State<AdminMasterPortalScreen> {
       body: IndexedStack(
         index: _currentTab,
         children: [
-          const AdminPendingApprovalsTab(),
+          const AdminUnifiedApprovalsDeskTab(),
           AdminShopsPayoutTab(role: widget.role),
           AdminRidersPayoutTab(role: widget.role),
           const AdminInventoryAuditTab(),
@@ -708,7 +604,7 @@ class _AdminMasterPortalScreenState extends State<AdminMasterPortalScreen> {
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.verified_user_rounded), label: 'Approvals'),
-          BottomNavigationBarItem(icon: Icon(Icons.storefront_rounded), label: 'Shops & Payout'),
+          BottomNavigationBarItem(icon: Icon(Icons.storefront_rounded), label: 'Shops Payout'),
           BottomNavigationBarItem(icon: Icon(Icons.delivery_dining_rounded), label: 'Riders Payout'),
           BottomNavigationBarItem(icon: Icon(Icons.inventory_rounded), label: 'Inventory'),
           BottomNavigationBarItem(icon: Icon(Icons.badge_rounded), label: 'HR Staff'),
@@ -719,12 +615,31 @@ class _AdminMasterPortalScreenState extends State<AdminMasterPortalScreen> {
 }
 
 // -------------------------------------------------------------
-// TAB 0: PENDING PARTNER REGISTRATIONS APPROVAL DESK
+// TAB 0: UNIFIED APPROVALS DESK (Shop Approvals + Rider Approvals)
 // -------------------------------------------------------------
-class AdminPendingApprovalsTab extends StatelessWidget {
-  const AdminPendingApprovalsTab({super.key});
+class AdminUnifiedApprovalsDeskTab extends StatefulWidget {
+  const AdminUnifiedApprovalsDeskTab({super.key});
 
-  void _openApprovalModal(BuildContext context, DocumentSnapshot doc) {
+  @override
+  State<AdminUnifiedApprovalsDeskTab> createState() => _AdminUnifiedApprovalsDeskTabState();
+}
+
+class _AdminUnifiedApprovalsDeskTabState extends State<AdminUnifiedApprovalsDeskTab> with SingleTickerProviderStateMixin {
+  late TabController _subTabCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _subTabCtrl = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _subTabCtrl.dispose();
+    super.dispose();
+  }
+
+  void _openShopApprovalModal(BuildContext context, DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     final shopName = data['shopName'] ?? 'Shop';
     final owner = data['ownerName'] ?? '';
@@ -739,7 +654,7 @@ class AdminPendingApprovalsTab extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Approve & Generate ID: $shopName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Text('Approve Shop: $shopName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -751,36 +666,27 @@ class AdminPendingApprovalsTab extends StatelessWidget {
               const Divider(height: 20),
               const Text('Create Permanent Partner Login Credentials:*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.brown)),
               const SizedBox(height: 8),
-              TextField(
-                controller: pIdCtrl,
-                decoration: const InputDecoration(labelText: 'Permanent Partner ID', border: OutlineInputBorder()),
-              ),
+              TextField(controller: pIdCtrl, decoration: const InputDecoration(labelText: 'Partner ID', border: OutlineInputBorder())),
               const SizedBox(height: 8),
-              TextField(
-                controller: pwdCtrl,
-                decoration: const InputDecoration(labelText: 'Store Password', border: OutlineInputBorder()),
-              ),
+              TextField(controller: pwdCtrl, decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder())),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () async {
-              // Reject application
               await FirebaseFirestore.instance.collection('partner_requests').doc(doc.id).update({'status': 'REJECTED'});
               if (ctx.mounted) Navigator.pop(ctx);
             },
-            child: const Text('Reject Application', style: TextStyle(color: Colors.red)),
+            child: const Text('Reject', style: TextStyle(color: Colors.red)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
             onPressed: () async {
               final newId = pIdCtrl.text.trim();
               final newPwd = pwdCtrl.text.trim();
-
               if (newId.isEmpty || newPwd.isEmpty) return;
 
-              // 1. Move to 'partners' collection for permanent login
               await FirebaseFirestore.instance.collection('partners').doc(newId).set({
                 'partnerId': newId,
                 'password': newPwd,
@@ -792,7 +698,6 @@ class AdminPendingApprovalsTab extends StatelessWidget {
                 'gstin': data['gstin'] ?? '',
                 'fssai': fssai,
                 'locationAddress': location,
-                'photoUrl': data['photoUrl'] ?? '',
                 'bankAccount': data['bankAccount'] ?? '',
                 'ifsc': data['ifsc'] ?? '',
                 'upiId': data['upiId'] ?? '',
@@ -804,20 +709,76 @@ class AdminPendingApprovalsTab extends StatelessWidget {
                 'approvedAt': FieldValue.serverTimestamp(),
               });
 
-              // 2. Mark request as APPROVED
               await FirebaseFirestore.instance.collection('partner_requests').doc(doc.id).update({
                 'status': 'APPROVED',
                 'partnerId': newId,
               });
 
               if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Shop "$shopName" approved! Partner ID: $newId'), backgroundColor: Colors.green),
-                );
-              }
             },
-            child: const Text('Confirm Approval & Issue ID', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text('Approve & Issue ID', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openRiderApprovalModal(BuildContext context, DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final name = data['name'] ?? 'Rider';
+    final phone = data['phone'] ?? '';
+    final vehicle = data['vehicleNumber'] ?? 'Two Wheeler';
+    final dl = data['dlNumber'] ?? 'N/A';
+    final upi = data['upiId'] ?? 'N/A';
+
+    final rIdCtrl = TextEditingController(text: 'RD-KZ-${100 + DateTime.now().millisecond}');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Approve Rider: $name', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Contact: +91 $phone', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text('Vehicle: $vehicle | DL: $dl', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+            Text('Payout UPI ID: $upi', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
+            const Divider(height: 20),
+            TextField(
+              controller: rIdCtrl,
+              decoration: const InputDecoration(labelText: 'Assigned Permanent Rider ID', border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await FirebaseFirestore.instance.collection('riders').doc(doc.id).update({
+                'isApproved': false,
+                'status': 'REJECTED',
+              });
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Reject Rider', style: TextStyle(color: Colors.red)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
+            onPressed: () async {
+              final assignedId = rIdCtrl.text.trim();
+              if (assignedId.isEmpty) return;
+
+              await FirebaseFirestore.instance.collection('riders').doc(doc.id).update({
+                'riderId': assignedId,
+                'isApproved': true,
+                'isSuspended': false,
+                'status': 'ACTIVE',
+                'approvedAt': FieldValue.serverTimestamp(),
+              });
+
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Approve & Activate Rider', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -826,86 +787,101 @@ class AdminPendingApprovalsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('partner_requests')
-          .where('status', isEqualTo: 'PENDING')
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final requests = snapshot.data!.docs;
+    return Column(
+      children: [
+        Container(
+          color: Colors.white,
+          child: TabBar(
+            controller: _subTabCtrl,
+            indicatorColor: AppColors.primary,
+            labelColor: AppColors.primary,
+            unselectedLabelColor: Colors.grey,
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            tabs: const [
+              Tab(icon: Icon(Icons.storefront_outlined), text: 'Shop Requests'),
+              Tab(icon: Icon(Icons.delivery_dining_outlined), text: 'Rider Requests'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _subTabCtrl,
+            children: [
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('partner_requests')
+                    .where('status', isEqualTo: 'PENDING')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  final requests = snapshot.data!.docs;
 
-        if (requests.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.verified_outlined, size: 64, color: Colors.grey.shade400),
-                const SizedBox(height: 12),
-                const Text('Koi nayi partner request pending nahi hai.', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                const Text('Naye partners jab register karenge, yahan request dikhegi.', style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
-          );
-        }
+                  if (requests.isEmpty) {
+                    return const Center(child: Text('Koi shop approval pending nahi hai.'));
+                  }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(14),
-          itemCount: requests.length,
-          itemBuilder: (context, i) {
-            final doc = requests[i];
-            final data = doc.data() as Map<String, dynamic>;
-            final shop = data['shopName'] ?? 'Shop';
-            final owner = data['ownerName'] ?? '';
-            final phone = data['phone'] ?? '';
-            final pan = data['panNumber'] ?? 'N/A';
-            final fssai = data['fssai'] ?? 'N/A';
-            final location = data['locationAddress'] ?? '';
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.orange.shade200),
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(14),
+                    itemCount: requests.length,
+                    itemBuilder: (context, i) {
+                      final doc = requests[i];
+                      final data = doc.data() as Map<String, dynamic>;
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
+                          title: Text(data['shopName'] ?? 'Shop', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('Owner: ${data['ownerName']} (+91 ${data['phone']})\nPAN: ${data['panNumber']} | FSSAI: ${data['fssai']}'),
+                          trailing: ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
+                            onPressed: () => _openShopApprovalModal(context, doc),
+                            child: const Text('Review', style: TextStyle(color: Colors.white, fontSize: 12)),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(shop, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(6)),
-                        child: const Text('PENDING APPROVAL', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 10)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text('Owner: $owner • Phone: +91 $phone', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  Text('PAN: $pan | FSSAI: $fssai', style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.bold)),
-                  Text('Location: $location', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                  const Divider(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
-                        onPressed: () => _openApprovalModal(context, doc),
-                        child: const Text('Review & Approve Shop ›', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ],
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('riders')
+                    .where('isApproved', isEqualTo: false)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  final pendingRiders = snapshot.data!.docs;
+
+                  if (pendingRiders.isEmpty) {
+                    return const Center(child: Text('Koi rider approval pending nahi hai.'));
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(14),
+                    itemCount: pendingRiders.length,
+                    itemBuilder: (context, i) {
+                      final doc = pendingRiders[i];
+                      final data = doc.data() as Map<String, dynamic>;
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
+                          leading: const CircleAvatar(backgroundColor: Colors.amber, child: Icon(Icons.person, color: Colors.black)),
+                          title: Text(data['name'] ?? 'Rider', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('Phone: +91 ${data['phone']}\nVehicle: ${data['vehicleNumber'] ?? 'Bike'} | DL: ${data['dlNumber'] ?? 'DL...'}'),
+                          trailing: ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
+                            onPressed: () => _openRiderApprovalModal(context, doc),
+                            child: const Text('Approve Rider', style: TextStyle(color: Colors.white, fontSize: 12)),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
-            );
-          },
-        );
-      },
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -913,39 +889,21 @@ class AdminPendingApprovalsTab extends StatelessWidget {
 // -------------------------------------------------------------
 // TAB 1: SHOPS COMMISSION & 1-CLICK PAYOUT
 // -------------------------------------------------------------
-class AdminShopsPayoutTab extends StatefulWidget {
+class AdminShopsPayoutTab extends StatelessWidget {
   final String role;
   const AdminShopsPayoutTab({super.key, required this.role});
 
-  @override
-  State<AdminShopsPayoutTab> createState() => _AdminShopsPayoutTabState();
-}
-
-class _AdminShopsPayoutTabState extends State<AdminShopsPayoutTab> {
-  void _executeShopPayout(String docId, String shopName, String bank, String upi, int amount) {
+  void _executeShopPayout(BuildContext context, String docId, String shopName, String bank, String upi, int amount) {
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payout amount ₹0 hai. Koi pending balance nahi hai!')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payout amount ₹0 hai.')));
       return;
     }
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Execute 1-Click Payout: $shopName'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Transfer Amount: ₹$amount', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green)),
-            const SizedBox(height: 6),
-            Text('Bank A/C: $bank', style: const TextStyle(fontSize: 12)),
-            Text('UPI ID: $upi', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            const Divider(height: 16),
-            const Text('Platform Commission (10%) deduct ho chuki hai. Bank account me transfer confirm karein:', style: TextStyle(fontSize: 11, color: Colors.grey)),
-          ],
-        ),
+        title: Text('1-Click Payout: $shopName'),
+        content: Text('Amount: ₹$amount (10% Comm. Cut)\nBank: $bank\nUPI: $upi'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
@@ -953,26 +911,11 @@ class _AdminShopsPayoutTabState extends State<AdminShopsPayoutTab> {
             onPressed: () async {
               await FirebaseFirestore.instance.collection('partners').doc(docId).update({
                 'pendingPayout': 0,
-                'lastSettledAmount': amount,
                 'lastSettledAt': FieldValue.serverTimestamp(),
               });
-
-              await FirebaseFirestore.instance.collection('settlement_logs').add({
-                'partnerId': docId,
-                'shopName': shopName,
-                'amount': amount,
-                'type': 'PARTNER_PAYOUT',
-                'settledAt': FieldValue.serverTimestamp(),
-              });
-
               if (ctx.mounted) Navigator.pop(ctx);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('₹$amount payout to $shopName successfully SETTLED!'), backgroundColor: Colors.green),
-                );
-              }
             },
-            child: const Text('Confirm Transfer & Clear', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text('Confirm Transfer', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -996,8 +939,6 @@ class _AdminShopsPayoutTabState extends State<AdminShopsPayoutTab> {
             final data = docs[i].data() as Map<String, dynamic>;
             final pId = docs[i].id;
             final shopName = data['shopName'] ?? 'Shop';
-            final owner = data['ownerName'] ?? '';
-            final phone = data['phone'] ?? '';
             final bank = data['bankAccount'] ?? 'N/A';
             final upi = data['upiId'] ?? 'N/A';
             final bool isSuspended = data['isSuspended'] ?? false;
@@ -1005,72 +946,48 @@ class _AdminShopsPayoutTabState extends State<AdminShopsPayoutTab> {
             final int commission = (grossSales * 0.10).round();
             final int netPayout = (data['pendingPayout'] as num?)?.toInt() ?? (grossSales - commission);
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isSuspended ? Colors.red.shade300 : Colors.grey.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(shopName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: isSuspended ? Colors.red.shade50 : Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(6),
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(shopName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text(isSuspended ? 'SUSPENDED' : 'ACTIVE', style: TextStyle(color: isSuspended ? Colors.red : Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
+                      ],
+                    ),
+                    Text('Bank: $bank | UPI: $upi', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Net Payable: ₹$netPayout', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.green)),
+                        Row(
+                          children: [
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
+                              onPressed: () => _executeShopPayout(context, pId, shopName, bank, upi, netPayout),
+                              child: const Text('1-Click Pay', style: TextStyle(color: Colors.white, fontSize: 11)),
+                            ),
+                            IconButton(
+                              icon: Icon(isSuspended ? Icons.play_arrow : Icons.block, color: isSuspended ? Colors.green : Colors.red),
+                              onPressed: () {
+                                FirebaseFirestore.instance.collection('partners').doc(pId).update({
+                                  'isSuspended': !isSuspended,
+                                  'isActive': !isSuspended,
+                                });
+                              },
+                            ),
+                          ],
                         ),
-                        child: Text(
-                          isSuspended ? 'SUSPENDED' : 'ACTIVE',
-                          style: TextStyle(color: isSuspended ? Colors.red : Colors.green.shade800, fontWeight: FontWeight.bold, fontSize: 10),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text('Owner: $owner • Phone: +91 $phone', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  Text('Bank: $bank | UPI: $upi', style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.bold)),
-                  const Divider(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Gross Sales: ₹$grossSales', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                          Text('Comm. Cut (10%): -₹$commission', style: const TextStyle(fontSize: 11, color: Colors.red)),
-                          Text('Payable: ₹$netPayout', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
-                            icon: const Icon(Icons.send_rounded, size: 14, color: Colors.white),
-                            label: const Text('1-Click Pay', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                            onPressed: () => _executeShopPayout(pId, shopName, bank, upi, netPayout),
-                          ),
-                          const SizedBox(width: 6),
-                          IconButton(
-                            icon: Icon(isSuspended ? Icons.play_arrow_rounded : Icons.block_flipped, color: isSuspended ? Colors.green : Colors.red),
-                            onPressed: () {
-                              FirebaseFirestore.instance.collection('partners').doc(pId).update({
-                                'isSuspended': !isSuspended,
-                                'isActive': isSuspended,
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -1081,57 +998,11 @@ class _AdminShopsPayoutTabState extends State<AdminShopsPayoutTab> {
 }
 
 // -------------------------------------------------------------
-// TAB 2: RIDERS APPROVAL & 1-CLICK PAYOUT
+// TAB 2: RIDERS PAYOUT & SUSPENSION
 // -------------------------------------------------------------
 class AdminRidersPayoutTab extends StatelessWidget {
   final String role;
   const AdminRidersPayoutTab({super.key, required this.role});
-
-  void _executeRiderPayout(BuildContext context, String rId, String name, String upi, int amount) {
-    if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Rider ka koi pending balance nahi hai!')),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Clear Rider Earning: $name'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Payout Amount: ₹$amount', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green)),
-            const SizedBox(height: 4),
-            Text('Rider UPI ID: $upi', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-            const Divider(height: 16),
-            const Text('Doorstep delivery rate: ₹35 per completed delivery.', style: TextStyle(fontSize: 11, color: Colors.grey)),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
-            onPressed: () async {
-              await FirebaseFirestore.instance.collection('riders').doc(rId).update({
-                'payoutEarned': 0,
-                'lastSettledAt': FieldValue.serverTimestamp(),
-              });
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('₹$amount paid to Rider $name!'), backgroundColor: Colors.green),
-                );
-              }
-            },
-            child: const Text('Transfer & Clear', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1141,7 +1012,7 @@ class AdminRidersPayoutTab extends StatelessWidget {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final docs = snapshot.data!.docs;
 
-        if (docs.isEmpty) return const Center(child: Text('Koi registered rider nahi hai.'));
+        if (docs.isEmpty) return const Center(child: Text('Koi rider register nahi hai.'));
 
         return ListView.builder(
           padding: const EdgeInsets.all(14),
@@ -1157,73 +1028,29 @@ class AdminRidersPayoutTab extends StatelessWidget {
             final int deliveries = (data['totalDeliveries'] as num?)?.toInt() ?? 8;
             final int payable = (data['payoutEarned'] as num?)?.toInt() ?? (deliveries * 35);
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isSuspended ? Colors.red.shade300 : Colors.grey.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('$name ($rId)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: !isApproved ? Colors.orange.shade50 : (isSuspended ? Colors.red.shade50 : Colors.green.shade50),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          !isApproved ? 'PENDING APPROVAL' : (isSuspended ? 'SUSPENDED' : 'ACTIVE RIDER'),
-                          style: TextStyle(
-                            color: !isApproved ? Colors.orange.shade800 : (isSuspended ? Colors.red : Colors.green.shade800),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text('Phone: +91 $phone | UPI: $upi', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  Text('Deliveries Completed: $deliveries orders', style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.bold)),
-                  const Divider(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Payable: ₹$payable', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green)),
-                      Row(
-                        children: [
-                          if (!isApproved)
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                              onPressed: () => FirebaseFirestore.instance.collection('riders').doc(rId).update({'isApproved': true}),
-                              child: const Text('Approve', style: TextStyle(color: Colors.white, fontSize: 11)),
-                            )
-                          else ...[
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
-                              icon: const Icon(Icons.send_rounded, size: 14, color: Colors.white),
-                              label: const Text('1-Click Pay', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                              onPressed: () => _executeRiderPayout(context, rId, name, upi, payable),
-                            ),
-                            IconButton(
-                              icon: Icon(isSuspended ? Icons.play_arrow : Icons.block, color: isSuspended ? Colors.green : Colors.red),
-                              onPressed: () {
-                                FirebaseFirestore.instance.collection('riders').doc(rId).update({'isSuspended': !isSuspended});
-                              },
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: ListTile(
+                title: Text('$name ($rId)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('Status: ${isApproved ? (isSuspended ? "Suspended" : "Active") : "Pending"}\nPhone: +91 $phone | Deliveries: $deliveries\nPayable: ₹$payable | UPI: $upi'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
+                      onPressed: () async {
+                        await FirebaseFirestore.instance.collection('riders').doc(rId).update({'payoutEarned': 0});
+                      },
+                      child: const Text('Pay', style: TextStyle(color: Colors.white, fontSize: 11)),
+                    ),
+                    IconButton(
+                      icon: Icon(isSuspended ? Icons.play_arrow : Icons.block, color: isSuspended ? Colors.green : Colors.red),
+                      onPressed: () {
+                        FirebaseFirestore.instance.collection('riders').doc(rId).update({'isSuspended': !isSuspended});
+                      },
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -1234,7 +1061,7 @@ class AdminRidersPayoutTab extends StatelessWidget {
 }
 
 // -------------------------------------------------------------
-// TAB 3: LIVE STORE INVENTORY & STOCK AUDIT
+// TAB 3: LIVE STORE INVENTORY AUDIT
 // -------------------------------------------------------------
 class AdminInventoryAuditTab extends StatelessWidget {
   const AdminInventoryAuditTab({super.key});
@@ -1247,58 +1074,34 @@ class AdminInventoryAuditTab extends StatelessWidget {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final products = snapshot.data!.docs;
 
-        return Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.all(14),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.blueGrey.shade900,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Text('Total: ${products.length} Items', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  Text('In Stock: ${products.where((p) => (p.data() as Map)['inStock'] == true).length}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
-                  Text('Out of Stock: ${products.where((p) => (p.data() as Map)['inStock'] != true).length}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                itemCount: products.length,
-                itemBuilder: (context, i) {
-                  final data = products[i].data() as Map<String, dynamic>;
-                  final name = data['name'] ?? 'Item';
-                  final price = data['price'] ?? 0;
-                  final unit = data['unit'] ?? '';
-                  final int stockQty = (data['stockQuantity'] as num?)?.toInt() ?? 0;
-                  final bool inStock = data['inStock'] ?? false;
+        return ListView.builder(
+          padding: const EdgeInsets.all(14),
+          itemCount: products.length,
+          itemBuilder: (context, i) {
+            final data = products[i].data() as Map<String, dynamic>;
+            final name = data['name'] ?? 'Item';
+            final price = data['price'] ?? 0;
+            final int stockQty = (data['stockQuantity'] as num?)?.toInt() ?? 0;
+            final bool inStock = data['inStock'] ?? false;
 
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: Icon(Icons.circle, size: 12, color: inStock ? Colors.green : Colors.red),
-                      title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      subtitle: Text('$unit • ₹$price | Hub Stock: $stockQty units'),
-                      trailing: Switch(
-                        value: inStock,
-                        activeTrackColor: const Color(0xFF0F9D58),
-                        onChanged: (val) {
-                          FirebaseFirestore.instance.collection('products').doc(products[i].id).update({
-                            'inStock': val,
-                            'isAvailable': val,
-                          });
-                        },
-                      ),
-                    ),
-                  );
-                },
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('₹$price | Stock: $stockQty units'),
+                trailing: Switch(
+                  value: inStock,
+                  activeTrackColor: const Color(0xFF0F9D58),
+                  onChanged: (val) {
+                    FirebaseFirestore.instance.collection('products').doc(products[i].id).update({
+                      'inStock': val,
+                      'isAvailable': val,
+                    });
+                  },
+                ),
               ),
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -1338,25 +1141,24 @@ class _AdminHRManagementTabState extends State<AdminHRManagementTab> {
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Create Sub-Admin / HR Login Access', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Staff Member Name*', border: OutlineInputBorder())),
+            const Text('Create Sub-Admin / HR Login', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 10),
+            TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Staff Name*', border: OutlineInputBorder())),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: _selectedRole,
               decoration: const InputDecoration(labelText: 'Assign Role', border: OutlineInputBorder()),
               items: const [
-                DropdownMenuItem(value: 'HR_ACCOUNTS', child: Text('HR & Accounts (Payout Specialist)')),
-                DropdownMenuItem(value: 'STORE_OPS_MANAGER', child: Text('Store Operations Manager')),
+                DropdownMenuItem(value: 'HR_ACCOUNTS', child: Text('HR & Accounts')),
+                DropdownMenuItem(value: 'STORE_OPS_MANAGER', child: Text('Store Operations')),
               ],
               onChanged: (val) => setState(() => _selectedRole = val!),
             ),
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: TextField(controller: _staffIdCtrl, decoration: const InputDecoration(labelText: 'Login Staff ID', border: OutlineInputBorder()))),
+                Expanded(child: TextField(controller: _staffIdCtrl, decoration: const InputDecoration(labelText: 'Staff ID', border: OutlineInputBorder()))),
                 const SizedBox(width: 8),
                 Expanded(child: TextField(controller: _passwordCtrl, decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder()))),
               ],
@@ -1364,7 +1166,6 @@ class _AdminHRManagementTabState extends State<AdminHRManagementTab> {
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              height: 46,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey.shade900),
                 onPressed: () async {
@@ -1380,7 +1181,7 @@ class _AdminHRManagementTabState extends State<AdminHRManagementTab> {
                   });
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
-                child: const Text('Save & Issue Credentials', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: const Text('Save Staff ID', style: TextStyle(color: Colors.white)),
               ),
             ),
           ],
@@ -1407,9 +1208,7 @@ class _AdminHRManagementTabState extends State<AdminHRManagementTab> {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final staffList = snapshot.data!.docs;
 
-          if (staffList.isEmpty) {
-            return const Center(child: Text('Koi HR / Sub-Admin account nahi bana hai.'));
-          }
+          if (staffList.isEmpty) return const Center(child: Text('Koi staff account nahi hai.'));
 
           return ListView.builder(
             padding: const EdgeInsets.all(14),
@@ -1423,11 +1222,9 @@ class _AdminHRManagementTabState extends State<AdminHRManagementTab> {
               final bool isActive = s['isActive'] ?? true;
 
               return Card(
-                margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.badge_outlined)),
-                  title: Text('$name ($id)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: Text('Role: $role\nPassword: $pwd'),
+                  title: Text('$name ($id)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('Role: $role | Password: $pwd'),
                   trailing: widget.isSuperAdmin
                       ? IconButton(
                           icon: Icon(isActive ? Icons.toggle_on : Icons.toggle_off, color: isActive ? Colors.green : Colors.grey, size: 36),
@@ -1447,17 +1244,13 @@ class _AdminHRManagementTabState extends State<AdminHRManagementTab> {
 }
 
 // -------------------------------------------------------------
-// 3. PARTNER DASHBOARD (Included for Store Nodes)
+// 3. PARTNER DASHBOARD (For Store Hub Nodes)
 // -------------------------------------------------------------
 class PartnerMainDashboard extends StatefulWidget {
   final String partnerId;
   final String shopName;
 
-  const PartnerMainDashboard({
-    super.key,
-    required this.partnerId,
-    required this.shopName,
-  });
+  const PartnerMainDashboard({super.key, required this.partnerId, required this.shopName});
 
   @override
   State<PartnerMainDashboard> createState() => _PartnerMainDashboardState();
@@ -1475,10 +1268,7 @@ class _PartnerMainDashboardState extends State<PartnerMainDashboard> {
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
