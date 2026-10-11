@@ -615,7 +615,7 @@ class _AdminMasterPortalScreenState extends State<AdminMasterPortalScreen> {
 }
 
 // -------------------------------------------------------------
-// TAB 0: UNIFIED APPROVALS DESK (Shop Approvals + Rider Approvals)
+// TAB 0: UNIFIED APPROVALS DESK (Shop Approvals + Rider Approvals with Password Creation)
 // -------------------------------------------------------------
 class AdminUnifiedApprovalsDeskTab extends StatefulWidget {
   const AdminUnifiedApprovalsDeskTab({super.key});
@@ -723,6 +723,7 @@ class _AdminUnifiedApprovalsDeskTabState extends State<AdminUnifiedApprovalsDesk
     );
   }
 
+  // Rider Approval Modal with Custom Password Creation
   void _openRiderApprovalModal(BuildContext context, DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     final name = data['name'] ?? 'Rider';
@@ -732,24 +733,38 @@ class _AdminUnifiedApprovalsDeskTabState extends State<AdminUnifiedApprovalsDesk
     final upi = data['upiId'] ?? 'N/A';
 
     final rIdCtrl = TextEditingController(text: 'RD-KZ-${100 + DateTime.now().millisecond}');
+    final pwdCtrl = TextEditingController(text: '${name.split(" ").first.toLowerCase()}@123');
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Approve Rider: $name', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Contact: +91 $phone', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            Text('Vehicle: $vehicle | DL: $dl', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
-            Text('Payout UPI ID: $upi', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
-            const Divider(height: 20),
-            TextField(
-              controller: rIdCtrl,
-              decoration: const InputDecoration(labelText: 'Assigned Permanent Rider ID', border: OutlineInputBorder()),
-            ),
-          ],
+        title: Text('Approve Rider & Set Password: $name', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Contact: +91 $phone', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Text('Vehicle: $vehicle | DL: $dl', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+              Text('Payout UPI ID: $upi', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
+              const Divider(height: 20),
+              const Text('Assigned Rider ID & Login Password:*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.brown)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: rIdCtrl,
+                decoration: const InputDecoration(labelText: 'Permanent Rider ID', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: pwdCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Rider Login Password',
+                  hintText: 'e.g. 1234 ya rishabh@123',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -766,10 +781,19 @@ class _AdminUnifiedApprovalsDeskTabState extends State<AdminUnifiedApprovalsDesk
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
             onPressed: () async {
               final assignedId = rIdCtrl.text.trim();
-              if (assignedId.isEmpty) return;
+              final assignedPassword = pwdCtrl.text.trim();
 
+              if (assignedId.isEmpty || assignedPassword.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Kripya Rider ID aur Password dono dalein!')),
+                );
+                return;
+              }
+
+              // Firestore me password, id aur approval status save hoga
               await FirebaseFirestore.instance.collection('riders').doc(doc.id).update({
                 'riderId': assignedId,
+                'password': assignedPassword,
                 'isApproved': true,
                 'isSuspended': false,
                 'status': 'ACTIVE',
@@ -777,8 +801,36 @@ class _AdminUnifiedApprovalsDeskTabState extends State<AdminUnifiedApprovalsDesk
               });
 
               if (ctx.mounted) Navigator.pop(ctx);
+
+              if (context.mounted) {
+                showDialog(
+                  context: context,
+                  builder: (dialogCtx) => AlertDialog(
+                    title: const Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green),
+                        SizedBox(width: 8),
+                        Text('Rider Approved!'),
+                      ],
+                    ),
+                    content: Text(
+                      'Rider "$name" approve ho gaya hai!\n\n'
+                      'Rider ID: $assignedId\n'
+                      'Password: $assignedPassword\n\n'
+                      'Yeh password rider ko de dijiye. Rider app me yehi password daalkar login kar lega.',
+                    ),
+                    actions: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        child: const Text('Done', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                );
+              }
             },
-            child: const Text('Approve & Activate Rider', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text('Approve & Set Password', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -978,7 +1030,7 @@ class AdminShopsPayoutTab extends StatelessWidget {
                               onPressed: () {
                                 FirebaseFirestore.instance.collection('partners').doc(pId).update({
                                   'isSuspended': !isSuspended,
-                                  'isActive': !isSuspended,
+                                  'isActive': isSuspended,
                                 });
                               },
                             ),
@@ -998,7 +1050,7 @@ class AdminShopsPayoutTab extends StatelessWidget {
 }
 
 // -------------------------------------------------------------
-// TAB 2: RIDERS PAYOUT & SUSPENSION
+// TAB 2: RIDERS PAYOUT, PASSWORD VIEW & SUSPENSION
 // -------------------------------------------------------------
 class AdminRidersPayoutTab extends StatelessWidget {
   final String role;
@@ -1023,6 +1075,7 @@ class AdminRidersPayoutTab extends StatelessWidget {
             final name = data['name'] ?? 'Rider';
             final phone = data['phone'] ?? '';
             final upi = data['upiId'] ?? 'rider@upi';
+            final password = data['password'] ?? 'Not Set (1234)';
             final bool isApproved = data['isApproved'] ?? false;
             final bool isSuspended = data['isSuspended'] ?? false;
             final int deliveries = (data['totalDeliveries'] as num?)?.toInt() ?? 8;
@@ -1032,7 +1085,7 @@ class AdminRidersPayoutTab extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               child: ListTile(
                 title: Text('$name ($rId)', style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('Status: ${isApproved ? (isSuspended ? "Suspended" : "Active") : "Pending"}\nPhone: +91 $phone | Deliveries: $deliveries\nPayable: ₹$payable | UPI: $upi'),
+                subtitle: Text('Status: ${isApproved ? (isSuspended ? "Suspended" : "Active") : "Pending"}\nPassword: $password\nPhone: +91 $phone | Deliveries: $deliveries\nPayable: ₹$payable | UPI: $upi'),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
