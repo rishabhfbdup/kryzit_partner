@@ -20,7 +20,7 @@ class KryzitPartnerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Kryzit Master Admin & Partner Hub',
+      title: 'Kryzit Partner & Admin Hub',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
@@ -32,7 +32,7 @@ class KryzitPartnerApp extends StatelessWidget {
 }
 
 // -------------------------------------------------------------
-// 1. DUAL GATEWAY (Partner / Super Admin & HR Login)
+// 1. TRIPLE GATEWAY (Partner Login / Admin Login / New Partner Registration)
 // -------------------------------------------------------------
 class AuthGatewayScreen extends StatefulWidget {
   const AuthGatewayScreen({super.key});
@@ -42,12 +42,41 @@ class AuthGatewayScreen extends StatefulWidget {
 }
 
 class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
-  bool _isAdminMode = false;
+  // Modes: 0 -> Partner Login, 1 -> Admin Login, 2 -> New Partner Self-Registration
+  int _activeMode = 0;
+
+  // Login Controllers
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
   String _errorMessage = '';
+
+  // New Partner Self-Registration Form Controllers
+  final _regShopNameCtrl = TextEditingController();
+  final _regOwnerNameCtrl = TextEditingController();
+  final _regPhoneCtrl = TextEditingController();
+  final _regEmailCtrl = TextEditingController();
+  final _regPanCtrl = TextEditingController();
+  final _regGstinCtrl = TextEditingController();
+  final _regFssaiCtrl = TextEditingController();
+  final _regLocationCtrl = TextEditingController();
+  final _regPhotoCtrl = TextEditingController();
+  final _regBankAccCtrl = TextEditingController();
+  final _regIfscCtrl = TextEditingController();
+  final _regUpiCtrl = TextEditingController();
+
+  final List<String> _availableCategories = [
+    'Vegetables & Fruits',
+    'Dairy, Bread & Eggs',
+    'Atta, Rice, Oil & Dals',
+    'Snacks & Munchies',
+    'Cold Drinks & Juices',
+    'Instant Food',
+    'Cleaning & Household',
+  ];
+  final Set<String> _regSelectedCategories = {'Vegetables & Fruits', 'Dairy, Bread & Eggs'};
+  bool _isSubmittingReg = false;
 
   static const String superAdminId = 'Kryzit@9616';
   static const String superAdminPass = 'Kryzit@961664#';
@@ -66,8 +95,8 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
       _errorMessage = '';
     });
 
-    if (_isAdminMode) {
-      // 1. Super Admin Match
+    if (_activeMode == 1) {
+      // Admin Login
       if (inputId == superAdminId && inputPass == superAdminPass) {
         setState(() => _isLoading = false);
         if (!mounted) return;
@@ -80,7 +109,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
         return;
       }
 
-      // 2. HR / Sub-Admin Match from Firestore
+      // HR Staff check
       try {
         final hrDoc = await FirebaseFirestore.instance
             .collection('admin_staff')
@@ -111,8 +140,8 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
         _isLoading = false;
         _errorMessage = 'Galat Admin/HR ID ya Password!';
       });
-    } else {
-      // Partner Login from Firestore
+    } else if (_activeMode == 0) {
+      // Partner Login
       try {
         final query = await FirebaseFirestore.instance
             .collection('partners')
@@ -129,7 +158,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
           if (isSuspended || !isActive) {
             setState(() {
               _isLoading = false;
-              _errorMessage = 'Aapki Partner ID suspended hai! Admin se sampark karein.';
+              _errorMessage = 'Aapka account suspended ya unapproved hai! Admin se sampark karein.';
             });
             return;
           }
@@ -146,7 +175,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
             ),
           );
         } else {
-          // Backward compatibility fallback
           if (inputId.toUpperCase() == 'KAMALGANJ01' && inputPass == 'admin') {
             setState(() => _isLoading = false);
             if (!mounted) return;
@@ -164,7 +192,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
 
           setState(() {
             _isLoading = false;
-            _errorMessage = 'Galat Partner ID ya Password!';
+            _errorMessage = 'Galat Partner ID ya Password! Agar naye hain to pehle register karein.';
           });
         }
       } catch (e) {
@@ -176,22 +204,101 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
     }
   }
 
+  // Submit Self-Registration Application to Admin
+  Future<void> _submitSelfOnboarding() async {
+    final shop = _regShopNameCtrl.text.trim();
+    final owner = _regOwnerNameCtrl.text.trim();
+    final phone = _regPhoneCtrl.text.trim();
+    final fssai = _regFssaiCtrl.text.trim();
+    final pan = _regPanCtrl.text.trim();
+    final location = _regLocationCtrl.text.trim();
+
+    if (shop.isEmpty || owner.isEmpty || phone.isEmpty || fssai.isEmpty || pan.isEmpty || location.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kripya Shop Name, Owner, Phone, PAN, FSSAI aur Location zaroor bharein!')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmittingReg = true);
+
+    try {
+      final String reqId = 'REQ-${DateTime.now().millisecondsSinceEpoch}';
+      await FirebaseFirestore.instance.collection('partner_requests').doc(reqId).set({
+        'requestId': reqId,
+        'shopName': shop,
+        'ownerName': owner,
+        'phone': phone,
+        'email': _regEmailCtrl.text.trim(),
+        'panNumber': pan,
+        'gstin': _regGstinCtrl.text.trim(),
+        'fssai': fssai,
+        'locationAddress': location,
+        'photoUrl': _regPhotoCtrl.text.trim().isEmpty
+            ? 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&q=80'
+            : _regPhotoCtrl.text.trim(),
+        'bankAccount': _regBankAccCtrl.text.trim(),
+        'ifsc': _regIfscCtrl.text.trim(),
+        'upiId': _regUpiCtrl.text.trim(),
+        'categories': _regSelectedCategories.toList(),
+        'status': 'PENDING', // PENDING, APPROVED, REJECTED
+        'submittedAt': FieldValue.serverTimestamp(),
+      });
+
+      setState(() {
+        _isSubmittingReg = false;
+        _activeMode = 0; // Switch to login screen
+      });
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green),
+              SizedBox(width: 8),
+              Text('Application Submitted!'),
+            ],
+          ),
+          content: Text(
+            'Aapki shop "$shop" ki registration request Admin ko bhej di gayi hai.\n\nAdmin details verify karke aapko Partner ID aur Password provide karenge, jiske baad aap Partner Login se login kar sakenge.',
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      setState(() => _isSubmittingReg = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Submission Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFFF9EE),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: BoxConstraints(maxWidth: _activeMode == 2 ? 650 : 420),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Top Brand Header
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
-                    color: _isAdminMode ? Colors.blueGrey.shade900 : Colors.amber.shade400,
+                    color: _activeMode == 1 ? Colors.blueGrey.shade900 : Colors.amber.shade400,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
@@ -202,24 +309,36 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                     ],
                   ),
                   child: Text(
-                    _isAdminMode ? 'kryzit super console' : 'kryzit partner portal',
+                    _activeMode == 1
+                        ? 'kryzit super console'
+                        : (_activeMode == 2 ? 'kryzit partner on-boarding' : 'kryzit partner portal'),
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: _isAdminMode ? Colors.white : Colors.black87,
+                      color: _activeMode == 1 ? Colors.white : Colors.black87,
                       letterSpacing: 1,
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
                 Text(
-                  _isAdminMode ? 'Admin & HR Financial Desk' : 'Dark Store Order & Stock Hub',
+                  _activeMode == 1
+                      ? 'Admin & Approvals Desk'
+                      : (_activeMode == 2 ? 'Register Your Store on Kryzit' : 'Store Order & Stock Hub'),
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  _activeMode == 2
+                      ? 'Submit your store details. Approval and login credentials will be provided by Admin.'
+                      : (_activeMode == 1 ? 'Super Admin: Kryzit@9616' : 'Enter Partner ID provided upon approval'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
                 const SizedBox(height: 20),
 
-                // Dual Toggle
+                // 3-Way Toggle Bar
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
@@ -228,135 +347,19 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                   ),
                   child: Row(
                     children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() {
-                            _isAdminMode = false;
-                            _errorMessage = '';
-                          }),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: !_isAdminMode ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Partner Login',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: !_isAdminMode ? AppColors.primary : Colors.grey.shade600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() {
-                            _isAdminMode = true;
-                            _errorMessage = '';
-                          }),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _isAdminMode ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Admin / HR Login',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: _isAdminMode ? Colors.blueGrey.shade900 : Colors.grey.shade600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                      _buildToggleButton(0, 'Partner Login'),
+                      _buildToggleButton(1, 'Admin Login'),
+                      _buildToggleButton(2, 'Register New Shop'),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
 
-                if (_errorMessage.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.red.shade200),
-                    ),
-                    child: Text(
-                      _errorMessage,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: TextField(
-                    controller: _idController,
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(_isAdminMode ? Icons.admin_panel_settings_rounded : Icons.storefront_rounded),
-                      hintText: _isAdminMode ? 'Admin / HR Staff ID' : 'Partner ID',
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: TextField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.lock_outline_rounded),
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                      ),
-                      hintText: 'Password',
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 22),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isAdminMode ? Colors.blueGrey.shade900 : AppColors.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: _isLoading ? null : _handleLogin,
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : Text(
-                            _isAdminMode ? 'Enter Admin / HR Console ›' : 'Enter Partner Dashboard ›',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                          ),
-                  ),
-                ),
+                // SCREEN CONTENT BASED ON ACTIVE MODE
+                if (_activeMode == 2)
+                  _buildSelfOnboardingForm()
+                else
+                  _buildLoginForm(),
               ],
             ),
           ),
@@ -364,10 +367,291 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
       ),
     );
   }
+
+  Widget _buildToggleButton(int modeIndex, String label) {
+    final bool isSel = _activeMode == modeIndex;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _activeMode = modeIndex;
+            _errorMessage = '';
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSel ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isSel ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4)] : [],
+          ),
+          child: Center(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                color: isSel
+                    ? (_activeMode == 1 ? Colors.blueGrey.shade900 : AppColors.primary)
+                    : Colors.grey.shade600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // LOGIN FORM (Modes 0 and 1)
+  Widget _buildLoginForm() {
+    return Column(
+      children: [
+        if (_errorMessage.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Text(
+              _errorMessage,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: TextField(
+            controller: _idController,
+            decoration: InputDecoration(
+              prefixIcon: Icon(_activeMode == 1 ? Icons.admin_panel_settings_rounded : Icons.storefront_rounded),
+              hintText: _activeMode == 1 ? 'Admin ID (Kryzit@9616)' : 'Partner ID (e.g. KZ-SHOP-101)',
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: TextField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.lock_outline_rounded),
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
+              hintText: 'Password',
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _activeMode == 1 ? Colors.blueGrey.shade900 : AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: _isLoading ? null : _handleLogin,
+            child: _isLoading
+                ? const CircularProgressIndicator(color: Colors.white)
+                : Text(
+                    _activeMode == 1 ? 'Enter Admin Console ›' : 'Enter Partner Dashboard ›',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // NEW PARTNER SELF-ONBOARDING APPLICATION FORM (Mode 2)
+  Widget _buildSelfOnboardingForm() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('1. Store & Owner Identity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _regShopNameCtrl,
+            decoration: const InputDecoration(labelText: 'Shop / Business Name*', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _regOwnerNameCtrl,
+                  decoration: const InputDecoration(labelText: 'Owner Full Name*', border: OutlineInputBorder()),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _regPhoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  decoration: const InputDecoration(labelText: 'Mobile Number*', counterText: '', border: OutlineInputBorder()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _regEmailCtrl,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 16),
+          const Text('2. Legal & Verification Documents', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _regPanCtrl,
+                  decoration: const InputDecoration(labelText: 'PAN Card Number*', border: OutlineInputBorder()),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _regFssaiCtrl,
+                  decoration: const InputDecoration(labelText: 'FSSAI License No.*', border: OutlineInputBorder()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _regGstinCtrl,
+            decoration: const InputDecoration(labelText: 'GSTIN Number (Optional)', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 16),
+          const Text('3. Location & Store Front', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _regLocationCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Shop Exact Address / Location (Kamalganj Area)*',
+              hintText: 'e.g. Near Railway Crossing, Bhatpura, Kamalganj',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _regPhotoCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Shop Photo Direct URL',
+              hintText: 'https://images.unsplash.com/...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('4. Bank Details for Payment Payouts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _regBankAccCtrl,
+            decoration: const InputDecoration(labelText: 'Bank Account Number', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _regIfscCtrl,
+                  decoration: const InputDecoration(labelText: 'IFSC Code', border: OutlineInputBorder()),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _regUpiCtrl,
+                  decoration: const InputDecoration(labelText: 'UPI ID (GPay / PhonePe)', border: OutlineInputBorder()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text('5. Categories You Will Sell:*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _availableCategories.map((cat) {
+              final isSel = _regSelectedCategories.contains(cat);
+              return FilterChip(
+                label: Text(cat, style: TextStyle(fontSize: 11, color: isSel ? Colors.white : Colors.black87)),
+                selected: isSel,
+                selectedColor: AppColors.primary,
+                onSelected: (val) {
+                  setState(() {
+                    if (val) {
+                      _regSelectedCategories.add(cat);
+                    } else {
+                      _regSelectedCategories.remove(cat);
+                    }
+                  });
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _isSubmittingReg ? null : _submitSelfOnboarding,
+              child: _isSubmittingReg
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text(
+                      'Submit Registration to Admin for Approval',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // -------------------------------------------------------------
-// 2. ENTERPRISE SUPER ADMIN & HR MASTER CONSOLE
+// 2. ADMIN MASTER CONSOLE (Tabs: Approvals, Shops, Riders, Inventory, HR)
 // -------------------------------------------------------------
 class AdminMasterPortalScreen extends StatefulWidget {
   final String role;
@@ -389,7 +673,7 @@ class _AdminMasterPortalScreenState extends State<AdminMasterPortalScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Kryzit Control Center', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+            const Text('Kryzit Super Control Center', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
             Text('${widget.staffName} (${widget.role})', style: const TextStyle(fontSize: 11, color: Colors.amber)),
           ],
         ),
@@ -407,6 +691,7 @@ class _AdminMasterPortalScreenState extends State<AdminMasterPortalScreen> {
       body: IndexedStack(
         index: _currentTab,
         children: [
+          const AdminPendingApprovalsTab(),
           AdminShopsPayoutTab(role: widget.role),
           AdminRidersPayoutTab(role: widget.role),
           const AdminInventoryAuditTab(),
@@ -420,11 +705,13 @@ class _AdminMasterPortalScreenState extends State<AdminMasterPortalScreen> {
         backgroundColor: Colors.white,
         selectedItemColor: Colors.blueGrey.shade900,
         unselectedItemColor: Colors.grey.shade500,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
         items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.verified_user_rounded), label: 'Approvals'),
           BottomNavigationBarItem(icon: Icon(Icons.storefront_rounded), label: 'Shops & Payout'),
           BottomNavigationBarItem(icon: Icon(Icons.delivery_dining_rounded), label: 'Riders Payout'),
-          BottomNavigationBarItem(icon: Icon(Icons.inventory_rounded), label: 'Store Inventory'),
-          BottomNavigationBarItem(icon: Icon(Icons.badge_rounded), label: 'HR / Staff IDs'),
+          BottomNavigationBarItem(icon: Icon(Icons.inventory_rounded), label: 'Inventory'),
+          BottomNavigationBarItem(icon: Icon(Icons.badge_rounded), label: 'HR Staff'),
         ],
       ),
     );
@@ -432,7 +719,199 @@ class _AdminMasterPortalScreenState extends State<AdminMasterPortalScreen> {
 }
 
 // -------------------------------------------------------------
-// TAB 1: SHOPS COMMISSION, 1-CLICK PAYOUT & ON-BOARDING
+// TAB 0: PENDING PARTNER REGISTRATIONS APPROVAL DESK
+// -------------------------------------------------------------
+class AdminPendingApprovalsTab extends StatelessWidget {
+  const AdminPendingApprovalsTab({super.key});
+
+  void _openApprovalModal(BuildContext context, DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final shopName = data['shopName'] ?? 'Shop';
+    final owner = data['ownerName'] ?? '';
+    final phone = data['phone'] ?? '';
+    final pan = data['panNumber'] ?? '';
+    final fssai = data['fssai'] ?? '';
+    final location = data['locationAddress'] ?? '';
+
+    final pIdCtrl = TextEditingController(text: 'KZ-${shopName.split(" ").first.toUpperCase()}-${100 + DateTime.now().millisecond}');
+    final pwdCtrl = TextEditingController(text: 'Kryzit@${1000 + DateTime.now().millisecond}');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Approve & Generate ID: $shopName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Owner: $owner (+91 $phone)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Text('PAN: $pan | FSSAI: $fssai', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+              Text('Location: $location', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              const Divider(height: 20),
+              const Text('Create Permanent Partner Login Credentials:*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.brown)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: pIdCtrl,
+                decoration: const InputDecoration(labelText: 'Permanent Partner ID', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: pwdCtrl,
+                decoration: const InputDecoration(labelText: 'Store Password', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              // Reject application
+              await FirebaseFirestore.instance.collection('partner_requests').doc(doc.id).update({'status': 'REJECTED'});
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Reject Application', style: TextStyle(color: Colors.red)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
+            onPressed: () async {
+              final newId = pIdCtrl.text.trim();
+              final newPwd = pwdCtrl.text.trim();
+
+              if (newId.isEmpty || newPwd.isEmpty) return;
+
+              // 1. Move to 'partners' collection for permanent login
+              await FirebaseFirestore.instance.collection('partners').doc(newId).set({
+                'partnerId': newId,
+                'password': newPwd,
+                'shopName': shopName,
+                'ownerName': owner,
+                'phone': phone,
+                'email': data['email'] ?? '',
+                'panNumber': pan,
+                'gstin': data['gstin'] ?? '',
+                'fssai': fssai,
+                'locationAddress': location,
+                'photoUrl': data['photoUrl'] ?? '',
+                'bankAccount': data['bankAccount'] ?? '',
+                'ifsc': data['ifsc'] ?? '',
+                'upiId': data['upiId'] ?? '',
+                'categories': data['categories'] ?? [],
+                'isActive': true,
+                'isSuspended': false,
+                'totalSales': 0,
+                'pendingPayout': 0,
+                'approvedAt': FieldValue.serverTimestamp(),
+              });
+
+              // 2. Mark request as APPROVED
+              await FirebaseFirestore.instance.collection('partner_requests').doc(doc.id).update({
+                'status': 'APPROVED',
+                'partnerId': newId,
+              });
+
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Shop "$shopName" approved! Partner ID: $newId'), backgroundColor: Colors.green),
+                );
+              }
+            },
+            child: const Text('Confirm Approval & Issue ID', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('partner_requests')
+          .where('status', isEqualTo: 'PENDING')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final requests = snapshot.data!.docs;
+
+        if (requests.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.verified_outlined, size: 64, color: Colors.grey.shade400),
+                const SizedBox(height: 12),
+                const Text('Koi nayi partner request pending nahi hai.', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                const Text('Naye partners jab register karenge, yahan request dikhegi.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(14),
+          itemCount: requests.length,
+          itemBuilder: (context, i) {
+            final doc = requests[i];
+            final data = doc.data() as Map<String, dynamic>;
+            final shop = data['shopName'] ?? 'Shop';
+            final owner = data['ownerName'] ?? '';
+            final phone = data['phone'] ?? '';
+            final pan = data['panNumber'] ?? 'N/A';
+            final fssai = data['fssai'] ?? 'N/A';
+            final location = data['locationAddress'] ?? '';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(shop, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(6)),
+                        child: const Text('PENDING APPROVAL', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 10)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Owner: $owner • Phone: +91 $phone', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text('PAN: $pan | FSSAI: $fssai', style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+                  Text('Location: $location', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  const Divider(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
+                        onPressed: () => _openApprovalModal(context, doc),
+                        child: const Text('Review & Approve Shop ›', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+// -------------------------------------------------------------
+// TAB 1: SHOPS COMMISSION & 1-CLICK PAYOUT
 // -------------------------------------------------------------
 class AdminShopsPayoutTab extends StatefulWidget {
   final String role;
@@ -443,7 +922,6 @@ class AdminShopsPayoutTab extends StatefulWidget {
 }
 
 class _AdminShopsPayoutTabState extends State<AdminShopsPayoutTab> {
-  // 1-Click Payout Settlement Dialog
   void _executeShopPayout(String docId, String shopName, String bank, String upi, int amount) {
     if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -473,7 +951,6 @@ class _AdminShopsPayoutTabState extends State<AdminShopsPayoutTab> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F9D58)),
             onPressed: () async {
-              // Reset pending payout & record settlement log
               await FirebaseFirestore.instance.collection('partners').doc(docId).update({
                 'pendingPayout': 0,
                 'lastSettledAmount': amount,
@@ -525,7 +1002,6 @@ class _AdminShopsPayoutTabState extends State<AdminShopsPayoutTab> {
             final upi = data['upiId'] ?? 'N/A';
             final bool isSuspended = data['isSuspended'] ?? false;
             final int grossSales = (data['totalSales'] as num?)?.toInt() ?? 2450;
-            // 10% commission deduction rule
             final int commission = (grossSales * 0.10).round();
             final int netPayout = (data['pendingPayout'] as num?)?.toInt() ?? (grossSales - commission);
 
@@ -605,7 +1081,7 @@ class _AdminShopsPayoutTabState extends State<AdminShopsPayoutTab> {
 }
 
 // -------------------------------------------------------------
-// TAB 2: RIDERS APPROVAL, 1-CLICK PAYOUT & SUSPENSION
+// TAB 2: RIDERS APPROVAL & 1-CLICK PAYOUT
 // -------------------------------------------------------------
 class AdminRidersPayoutTab extends StatelessWidget {
   final String role;
@@ -783,7 +1259,7 @@ class AdminInventoryAuditTab extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  Text('Total Listed: ${products.length} Items', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text('Total: ${products.length} Items', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   Text('In Stock: ${products.where((p) => (p.data() as Map)['inStock'] == true).length}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
                   Text('Out of Stock: ${products.where((p) => (p.data() as Map)['inStock'] != true).length}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                 ],
