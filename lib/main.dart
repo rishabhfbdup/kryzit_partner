@@ -32,7 +32,7 @@ class KryzitPartnerApp extends StatelessWidget {
 }
 
 // -------------------------------------------------------------
-// 1. DUAL AUTH GATEWAY (Partner Login / Admin Login Toggle)
+// 1. DUAL AUTH GATEWAY (Partner Login / Admin Login)
 // -------------------------------------------------------------
 class AuthGatewayScreen extends StatefulWidget {
   const AuthGatewayScreen({super.key});
@@ -50,7 +50,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
   bool _isLoading = false;
   String _errorMessage = '';
 
-  // Hardcoded Super Admin Credentials
   static const String adminIdConst = 'Kryzit@9616';
   static const String adminPasswordConst = 'Kryzit@961664#';
 
@@ -69,12 +68,11 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
     });
 
     if (_isAdminMode) {
-      // 1. ADMIN LOGIN VERIFICATION
       if (inputId == adminIdConst && inputPassword == adminPasswordConst) {
         setState(() => _isLoading = false);
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (c) => const AdminOnboardingDashboardScreen()),
+          MaterialPageRoute(builder: (c) => const AdminMasterPortalScreen()),
         );
       } else {
         setState(() {
@@ -83,7 +81,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
         });
       }
     } else {
-      // 2. PARTNER LOGIN VERIFICATION (From Firestore 'partners' collection)
       try {
         final query = await FirebaseFirestore.instance
             .collection('partners')
@@ -94,6 +91,17 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
 
         if (query.docs.isNotEmpty) {
           final partnerData = query.docs.first.data();
+          final bool isSuspended = partnerData['isSuspended'] ?? false;
+          final bool isActive = partnerData['isActive'] ?? true;
+
+          if (isSuspended || !isActive) {
+            setState(() {
+              _isLoading = false;
+              _errorMessage = 'Aapki Partner ID ko Admin dwara SUSPEND kar diya gaya hai. Kripya Admin se sampark karein.';
+            });
+            return;
+          }
+
           setState(() => _isLoading = false);
           if (!mounted) return;
           Navigator.pushReplacement(
@@ -106,7 +114,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
             ),
           );
         } else {
-          // Backward compatibility: agar KAMALGANJ01 hai
           if (inputId.toUpperCase() == 'KAMALGANJ01' && inputPassword == 'admin') {
             setState(() => _isLoading = false);
             if (!mounted) return;
@@ -124,7 +131,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
 
           setState(() {
             _isLoading = false;
-            _errorMessage = 'Galat Partner ID ya Password! Kya aapki shop onboarded hai?';
+            _errorMessage = 'Galat Partner ID ya Password!';
           });
         }
       } catch (e) {
@@ -148,11 +155,10 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Top Brand Pill
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
-                    color: _isAdminMode ? Colors.blueGrey.shade800 : Colors.amber.shade400,
+                    color: _isAdminMode ? Colors.blueGrey.shade900 : Colors.amber.shade400,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
@@ -172,23 +178,23 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 Text(
-                  _isAdminMode ? 'Admin & Shop Onboarding Desk' : 'Dark Store Order & Stock Hub',
+                  _isAdminMode ? 'Super Control & Payout Desk' : 'Dark Store Order & Stock Hub',
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   _isAdminMode
-                    ? 'Only authorized personnel can onboard shops'
-                    : 'Log in with credentials provided by Kryzit Admin',
+                      ? 'ID: Kryzit@9616 | Password: Kryzit@961664#'
+                      : 'Log in with credentials provided by Kryzit Admin',
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 20),
 
-                // Toggle Bar (Partner Login vs Admin Login)
+                // Dual Toggle
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
@@ -289,7 +295,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                     ),
                   ),
 
-                // ID Input
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -303,7 +308,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                         _isAdminMode ? Icons.admin_panel_settings_rounded : Icons.storefront_rounded,
                         color: Colors.black87,
                       ),
-                      hintText: _isAdminMode ? 'Enter Admin ID' : 'Partner ID (e.g. KZ-SHOP-101)',
+                      hintText: _isAdminMode ? 'Enter Admin ID (Kryzit@9616)' : 'Partner ID',
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -311,7 +316,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // Password Input
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -338,7 +342,6 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                 ),
                 const SizedBox(height: 22),
 
-                // Login Submit Button
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -355,7 +358,7 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                           )
                         : Text(
-                            _isAdminMode ? 'Enter Admin Dashboard ›' : 'Enter Partner Dashboard ›',
+                            _isAdminMode ? 'Open Super Admin Console ›' : 'Enter Partner Dashboard ›',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                   ),
@@ -370,26 +373,100 @@ class _AuthGatewayScreenState extends State<AuthGatewayScreen> {
 }
 
 // -------------------------------------------------------------
-// 2. ADMIN SHOP ON-BOARDING DASHBOARD
+// 2. SUPER ADMIN MASTER CONSOLE (Tabs: Shops, Riders, Orders & Payouts)
 // -------------------------------------------------------------
-class AdminOnboardingDashboardScreen extends StatefulWidget {
-  const AdminOnboardingDashboardScreen({super.key});
+class AdminMasterPortalScreen extends StatefulWidget {
+  const AdminMasterPortalScreen({super.key});
 
   @override
-  State<AdminOnboardingDashboardScreen> createState() => _AdminOnboardingDashboardScreenState();
+  State<AdminMasterPortalScreen> createState() => _AdminMasterPortalScreenState();
 }
 
-class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboardScreen> {
-  // Onboarding Form Controllers
+class _AdminMasterPortalScreenState extends State<AdminMasterPortalScreen> {
+  int _currentTab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FA),
+      appBar: AppBar(
+        title: const Text(
+          'Kryzit Super Admin Console',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
+        ),
+        backgroundColor: Colors.blueGrey.shade900,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: 'Log out',
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (c) => const AuthGatewayScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+      body: IndexedStack(
+        index: _currentTab,
+        children: const [
+          AdminShopsTab(),
+          AdminRidersTab(),
+          AdminTransactionsTab(),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentTab,
+        onTap: (i) => setState(() => _currentTab = i),
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        selectedItemColor: Colors.blueGrey.shade900,
+        unselectedItemColor: Colors.grey.shade500,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.storefront_rounded),
+            label: 'Shops & Payout',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.delivery_dining_rounded),
+            label: 'Riders & Approval',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.account_balance_wallet_rounded),
+            label: 'Len-Den & Orders',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// -------------------------------------------------------------
+// TAB 1: SHOPS MANAGEMENT, SUSPENSION & PAYOUTS
+// -------------------------------------------------------------
+class AdminShopsTab extends StatefulWidget {
+  const AdminShopsTab({super.key});
+
+  @override
+  State<AdminShopsTab> createState() => _AdminShopsTabState();
+}
+
+class _AdminShopsTabState extends State<AdminShopsTab> {
+  // Onboarding Controllers
   final _shopNameCtrl = TextEditingController();
   final _ownerNameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _gstinCtrl = TextEditingController();
   final _fssaiCtrl = TextEditingController();
-  final _photoUrlCtrl = TextEditingController();
-  final _locationAddressCtrl = TextEditingController();
+  final _locationCtrl = TextEditingController();
   final _partnerIdCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  // Bank Account Details for Payout
+  final _bankAccCtrl = TextEditingController();
+  final _ifscCtrl = TextEditingController();
+  final _upiCtrl = TextEditingController();
 
   final List<String> _availableCategories = [
     'Vegetables & Fruits',
@@ -400,7 +477,6 @@ class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboar
     'Instant Food',
     'Cleaning & Household',
   ];
-
   final Set<String> _selectedCategories = {'Vegetables & Fruits', 'Dairy, Bread & Eggs'};
   bool _isSaving = false;
 
@@ -414,7 +490,7 @@ class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboar
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => Container(
-          height: MediaQuery.of(context).size.height * 0.9,
+          height: MediaQuery.of(context).size.height * 0.92,
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
             top: 20,
@@ -432,67 +508,47 @@ class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboar
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('New Shop On-boarding Form',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                    const Text('Onboard New Shop & Partner', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                     IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
                   ],
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _shopNameCtrl,
-                  decoration: const InputDecoration(labelText: 'Shop / Store Name*', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(labelText: 'Shop Name*', border: OutlineInputBorder()),
                 ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _ownerNameCtrl,
-                        decoration: const InputDecoration(labelText: 'Owner Name*', border: OutlineInputBorder()),
-                      ),
-                    ),
+                    Expanded(child: TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name*', border: OutlineInputBorder()))),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: _phoneCtrl,
-                        keyboardType: TextInputType.phone,
-                        maxLength: 10,
-                        decoration: const InputDecoration(labelText: 'Mobile Number*', counterText: '', border: OutlineInputBorder()),
-                      ),
-                    ),
+                    Expanded(child: TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, maxLength: 10, decoration: const InputDecoration(labelText: 'Phone*', counterText: '', border: OutlineInputBorder()))),
                   ],
                 ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _gstinCtrl,
-                        decoration: const InputDecoration(labelText: 'GSTIN (Optional)', border: OutlineInputBorder()),
-                      ),
-                    ),
+                    Expanded(child: TextField(controller: _fssaiCtrl, decoration: const InputDecoration(labelText: 'FSSAI No.*', border: OutlineInputBorder()))),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: _fssaiCtrl,
-                        decoration: const InputDecoration(labelText: 'FSSAI License No.*', border: OutlineInputBorder()),
-                      ),
-                    ),
+                    Expanded(child: TextField(controller: _gstinCtrl, decoration: const InputDecoration(labelText: 'GSTIN (Optional)', border: OutlineInputBorder()))),
                   ],
                 ),
                 const SizedBox(height: 10),
                 TextField(
-                  controller: _photoUrlCtrl,
-                  decoration: const InputDecoration(labelText: 'Shop Photo Direct URL', border: OutlineInputBorder()),
+                  controller: _locationCtrl,
+                  decoration: const InputDecoration(labelText: 'Shop Location (Kamalganj Area)*', border: OutlineInputBorder()),
                 ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _locationAddressCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Shop Exact Location / Address (Kamalganj 5km Area)*',
-                    hintText: 'e.g. Near Railway Road / Bhatpura Village',
-                    border: OutlineInputBorder(),
-                  ),
+                const SizedBox(height: 12),
+                const Text('Partner Bank Account (For Payout Settlement):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey)),
+                const SizedBox(height: 6),
+                TextField(controller: _bankAccCtrl, decoration: const InputDecoration(labelText: 'Bank Account Number', border: OutlineInputBorder())),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: TextField(controller: _ifscCtrl, decoration: const InputDecoration(labelText: 'IFSC Code', border: OutlineInputBorder()))),
+                    const SizedBox(width: 10),
+                    Expanded(child: TextField(controller: _upiCtrl, decoration: const InputDecoration(labelText: 'UPI ID (GPay / PhonePe)', border: OutlineInputBorder()))),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 const Text('Select Selling Categories:*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -526,39 +582,11 @@ class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboar
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.amber.shade200),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      const Text('Permanent Login Credentials for Partner:*',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.brown)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _partnerIdCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Permanent Partner ID',
-                                fillColor: Colors.white,
-                                filled: true,
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextField(
-                              controller: _passwordCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Permanent Password',
-                                fillColor: Colors.white,
-                                filled: true,
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      Expanded(child: TextField(controller: _partnerIdCtrl, decoration: const InputDecoration(labelText: 'Partner ID', border: OutlineInputBorder(), fillColor: Colors.white, filled: true))),
+                      const SizedBox(width: 8),
+                      Expanded(child: TextField(controller: _passwordCtrl, decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder(), fillColor: Colors.white, filled: true))),
                     ],
                   ),
                 ),
@@ -567,62 +595,49 @@ class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboar
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
                     onPressed: _isSaving
                         ? null
                         : () async {
                             final shop = _shopNameCtrl.text.trim();
-                            final owner = _ownerNameCtrl.text.trim();
-                            final phone = _phoneCtrl.text.trim();
                             final pId = _partnerIdCtrl.text.trim();
                             final pwd = _passwordCtrl.text.trim();
 
-                            if (shop.isEmpty || owner.isEmpty || phone.isEmpty || pId.isEmpty || pwd.isEmpty) {
+                            if (shop.isEmpty || pId.isEmpty || pwd.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Kripya zaroori details aur ID/Password bharein!')),
+                                const SnackBar(content: Text('Kripya zaroori details bharein!')),
                               );
                               return;
                             }
 
                             setSheetState(() => _isSaving = true);
 
-                            // Save to Firestore 'partners' collection
                             await FirebaseFirestore.instance.collection('partners').doc(pId).set({
                               'partnerId': pId,
                               'password': pwd,
                               'shopName': shop,
-                              'ownerName': owner,
-                              'phone': phone,
+                              'ownerName': _ownerNameCtrl.text.trim(),
+                              'phone': _phoneCtrl.text.trim(),
                               'gstin': _gstinCtrl.text.trim(),
                               'fssai': _fssaiCtrl.text.trim(),
-                              'photoUrl': _photoUrlCtrl.text.trim().isEmpty
-                                  ? 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&q=80'
-                                  : _photoUrlCtrl.text.trim(),
-                              'locationAddress': _locationAddressCtrl.text.trim(),
+                              'locationAddress': _locationCtrl.text.trim(),
+                              'bankAccount': _bankAccCtrl.text.trim(),
+                              'ifsc': _ifscCtrl.text.trim(),
+                              'upiId': _upiCtrl.text.trim(),
                               'categories': _selectedCategories.toList(),
                               'isActive': true,
+                              'isSuspended': false,
+                              'totalOrdersCount': 0,
+                              'pendingPayout': 0,
                               'onboardedAt': FieldValue.serverTimestamp(),
                             });
 
                             setSheetState(() => _isSaving = false);
                             if (ctx.mounted) Navigator.pop(ctx);
-
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Shop "$shop" onboard ho gayi! Partner ID: $pId'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            }
                           },
                     child: _isSaving
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text('Save & Generate Partner Account',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        : const Text('Save & Create Active Shop', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -633,70 +648,47 @@ class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboar
     );
   }
 
+  // Toggle Suspend / Active Partner
+  Future<void> _togglePartnerSuspend(String docId, bool currentSuspended) async {
+    await FirebaseFirestore.instance.collection('partners').doc(docId).set({
+      'isSuspended': !currentSuspended,
+      'isActive': currentSuspended, // suspended = not active
+    }, SetOptions(merge: true));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
-        title: const Text('Admin Console: Onboarded Shops',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-        backgroundColor: Colors.blueGrey.shade900,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (c) => const AuthGatewayScreen()),
-              );
-            },
-          ),
-        ],
-      ),
+      backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
+        backgroundColor: Colors.blueGrey.shade900,
         icon: const Icon(Icons.add_business_rounded, color: Colors.white),
-        label: const Text('Onboard New Shop', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        label: const Text('Onboard Shop', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         onPressed: _openOnboardingSheet,
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('partners').snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFF0F9D58)));
-          }
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final docs = snapshot.data!.docs;
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.storefront_outlined, size: 64, color: Colors.grey.shade400),
-                  const SizedBox(height: 12),
-                  const Text('Abhi tak koi shop onboard nahi hai.',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 6),
-                  const Text('Neeche button dabakar pehli shop onboard karein.',
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
-                ],
-              ),
-            );
+          if (docs.isEmpty) {
+            return const Center(child: Text('Koi shop onboard nahi hai.'));
           }
-
-          final partners = snapshot.data!.docs;
 
           return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: partners.length,
+            padding: const EdgeInsets.all(14),
+            itemCount: docs.length,
             itemBuilder: (context, i) {
-              final data = partners[i].data() as Map<String, dynamic>;
-              final shopName = data['shopName'] ?? 'Shop';
-              final owner = data['ownerName'] ?? '';
-              final pId = data['partnerId'] ?? '';
-              final pwd = data['password'] ?? '';
-              final phone = data['phone'] ?? '';
-              final address = data['locationAddress'] ?? 'Kamalganj Area';
-              final bool isActive = data['isActive'] ?? true;
+              final d = docs[i].data() as Map<String, dynamic>;
+              final pId = d['partnerId'] ?? docs[i].id;
+              final shopName = d['shopName'] ?? 'Shop';
+              final owner = d['ownerName'] ?? '';
+              final phone = d['phone'] ?? '';
+              final bank = d['bankAccount'] ?? 'N/A';
+              final upi = d['upiId'] ?? 'N/A';
+              final bool isSuspended = d['isSuspended'] ?? false;
+              final int pendingPayout = d['pendingPayout'] ?? 0;
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -704,7 +696,10 @@ class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboar
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade200),
+                  border: Border.all(
+                    color: isSuspended ? Colors.red.shade300 : Colors.green.shade200,
+                    width: 1.4,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -712,19 +707,19 @@ class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboar
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(shopName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text(shopName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: isActive ? Colors.green.shade50 : Colors.red.shade50,
+                            color: isSuspended ? Colors.red.shade50 : Colors.green.shade50,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            isActive ? 'ACTIVE STORE' : 'DISABLED',
+                            isSuspended ? 'SUSPENDED' : 'ACTIVE SHOP',
                             style: TextStyle(
-                              fontSize: 9,
+                              color: isSuspended ? Colors.red : Colors.green.shade800,
                               fontWeight: FontWeight.bold,
-                              color: isActive ? Colors.green.shade800 : Colors.red,
+                              fontSize: 10,
                             ),
                           ),
                         ),
@@ -732,7 +727,7 @@ class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboar
                     ),
                     const SizedBox(height: 4),
                     Text('Owner: $owner • Phone: +91 $phone', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                    Text('Location: $address', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                    Text('Bank A/C: $bank | UPI: $upi', style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.w600)),
                     const Divider(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -740,15 +735,28 @@ class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboar
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Partner ID: $pId', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0F9D58))),
-                            Text('Password: $pwd', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11, color: Colors.brown)),
+                            Text('ID: $pId', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0F9D58))),
+                            Text('Dena Hai (Payout): ₹$pendingPayout', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.orange)),
                           ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                          onPressed: () {
-                            FirebaseFirestore.instance.collection('partners').doc(pId).delete();
-                          },
+                        Row(
+                          children: [
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isSuspended ? Colors.green : Colors.red,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                              onPressed: () => _togglePartnerSuspend(docs[i].id, isSuspended),
+                              child: Text(
+                                isSuspended ? 'Unsuspend (Active)' : 'Suspend Shop',
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.grey, size: 20),
+                              onPressed: () => FirebaseFirestore.instance.collection('partners').doc(docs[i].id).delete(),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -764,7 +772,311 @@ class _AdminOnboardingDashboardScreenState extends State<AdminOnboardingDashboar
 }
 
 // -------------------------------------------------------------
-// 3. MAIN PARTNER DASHBOARD (Orders Queue, Inventory, Profile)
+// TAB 2: RIDERS APPROVAL, SUSPENSION & ACTIVE DESK
+// -------------------------------------------------------------
+class AdminRidersTab extends StatefulWidget {
+  const AdminRidersTab({super.key});
+
+  @override
+  State<AdminRidersTab> createState() => _AdminRidersTabState();
+}
+
+class _AdminRidersTabState extends State<AdminRidersTab> {
+  // Add Manual Rider Sheet
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _vehicleCtrl = TextEditingController();
+  final _dlCtrl = TextEditingController();
+
+  void _openAddRiderSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          top: 20,
+          left: 20,
+          right: 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Onboard New Delivery Rider', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 10),
+            TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Rider Name*', border: OutlineInputBorder())),
+            const SizedBox(height: 8),
+            TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone*', border: OutlineInputBorder())),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: TextField(controller: _vehicleCtrl, decoration: const InputDecoration(labelText: 'Vehicle No. (UP 76...)', border: OutlineInputBorder()))),
+                const SizedBox(width: 8),
+                Expanded(child: TextField(controller: _dlCtrl, decoration: const InputDecoration(labelText: 'DL Number', border: OutlineInputBorder()))),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                onPressed: () async {
+                  if (_nameCtrl.text.isEmpty || _phoneCtrl.text.isEmpty) return;
+                  final rId = 'RD-${100 + DateTime.now().millisecond}';
+                  await FirebaseFirestore.instance.collection('riders').doc(rId).set({
+                    'riderId': rId,
+                    'name': _nameCtrl.text.trim(),
+                    'phone': _phoneCtrl.text.trim(),
+                    'vehicleNumber': _vehicleCtrl.text.trim(),
+                    'dlNumber': _dlCtrl.text.trim(),
+                    'isApproved': true,
+                    'isSuspended': false,
+                    'totalDeliveries': 0,
+                    'payoutEarned': 0,
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                child: const Text('Approve & Add Rider', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.blueGrey.shade900,
+        icon: const Icon(Icons.two_wheeler_rounded, color: Colors.white),
+        label: const Text('Add Rider', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        onPressed: _openAddRiderSheet,
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('riders').snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final riders = snapshot.data!.docs;
+
+          if (riders.isEmpty) {
+            return const Center(child: Text('Abhi koi rider registered nahi hai.'));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(14),
+            itemCount: riders.length,
+            itemBuilder: (context, i) {
+              final r = riders[i].data() as Map<String, dynamic>;
+              final rId = r['riderId'] ?? riders[i].id;
+              final name = r['name'] ?? 'Rider';
+              final phone = r['phone'] ?? '';
+              final vehicle = r['vehicleNumber'] ?? 'Two Wheeler';
+              final bool isApproved = r['isApproved'] ?? false;
+              final bool isSuspended = r['isSuspended'] ?? false;
+              final int deliveries = r['totalDeliveries'] ?? 0;
+              final int earned = r['payoutEarned'] ?? 0;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSuspended
+                        ? Colors.red.shade300
+                        : (!isApproved ? Colors.orange.shade300 : Colors.green.shade200),
+                    width: 1.4,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('$name ($rId)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isSuspended
+                                ? Colors.red.shade50
+                                : (!isApproved ? Colors.orange.shade50 : Colors.green.shade50),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            isSuspended ? 'SUSPENDED' : (!isApproved ? 'PENDING APPROVAL' : 'APPROVED & ACTIVE'),
+                            style: TextStyle(
+                              color: isSuspended ? Colors.red : (!isApproved ? Colors.orange.shade800 : Colors.green.shade800),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Phone: +91 $phone • Vehicle: $vehicle', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 2),
+                    Text('Total Deliveries: $deliveries • Rider Earning: ₹$earned', style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+                    const Divider(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (!isApproved)
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                            onPressed: () {
+                              FirebaseFirestore.instance.collection('riders').doc(riders[i].id).update({'isApproved': true});
+                            },
+                            child: const Text('Approve Rider', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                          )
+                        else
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: isSuspended ? Colors.green : Colors.red),
+                            onPressed: () {
+                              FirebaseFirestore.instance.collection('riders').doc(riders[i].id).update({
+                                'isSuspended': !isSuspended,
+                              });
+                            },
+                            child: Text(isSuspended ? 'Activate Rider' : 'Suspend Rider', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// -------------------------------------------------------------
+// TAB 3: LEN-DEN (TRANSACTIONS), ORDERS & SETTLEMENTS
+// -------------------------------------------------------------
+class AdminTransactionsTab extends StatelessWidget {
+  const AdminTransactionsTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('orders').orderBy('createdAt', descending: true).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final orders = snapshot.data!.docs;
+
+        int totalBusinessAmount = 0;
+        int totalOrdersCount = orders.length;
+
+        for (var doc in orders) {
+          final data = doc.data() as Map<String, dynamic>;
+          totalBusinessAmount += (data['orderAmount'] as num?)?.toInt() ?? 0;
+        }
+
+        return Column(
+          children: [
+            // Top Financial Metrics Card
+            Container(
+              margin: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.shade900,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Column(
+                    children: [
+                      const Text('Total Orders', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      const SizedBox(height: 4),
+                      Text('$totalOrdersCount', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  Container(width: 1, height: 40, color: Colors.white24),
+                  Column(
+                    children: [
+                      const Text('Total GMV (Turnover)', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      const SizedBox(height: 4),
+                      Text('₹$totalBusinessAmount', style: const TextStyle(color: Colors.amber, fontSize: 20, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Live Len-Den & Order Tracking Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              ),
+            ),
+
+            Expanded(
+              child: orders.isEmpty
+                  ? const Center(child: Text('Koi order record nahi hai.'))
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(14),
+                      itemCount: orders.length,
+                      itemBuilder: (context, i) {
+                        final o = orders[i].data() as Map<String, dynamic>;
+                        final orderId = o['orderId'] ?? '#KZ-ORD';
+                        final amount = o['orderAmount'] ?? 0;
+                        final status = o['status'] ?? 'STORE_PACKING';
+                        final store = o['storeName'] ?? 'Kamalganj Dark Store Hub';
+                        final customer = o['customerName'] ?? 'Customer';
+                        final phone = o['customerPhone'] ?? '';
+                        final payment = o['paymentMethod'] ?? 'COD';
+                        final riderName = o['riderName'] ?? 'Unassigned Rider';
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(orderId, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  Text('₹$amount', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.green)),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text('Customer: $customer (+91 $phone)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text('Shop Node: $store', style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.w600)),
+                              Text('Rider Assigned: $riderName • Status: $status', style: const TextStyle(fontSize: 11, color: Colors.brown)),
+                              const SizedBox(height: 4),
+                              Text('Payment Mode: $payment', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// -------------------------------------------------------------
+// 3. PARTNER DASHBOARD SCREEN
 // -------------------------------------------------------------
 class PartnerMainDashboard extends StatefulWidget {
   final String partnerId;
@@ -804,7 +1116,6 @@ class _PartnerMainDashboardState extends State<PartnerMainDashboard> {
         selectedItemColor: AppColors.primary,
         unselectedItemColor: Colors.grey.shade500,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-        unselectedLabelStyle: const TextStyle(fontSize: 12),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long_rounded),
@@ -852,10 +1163,7 @@ class _PartnerProfileScreenState extends State<PartnerProfileScreen> {
         title: const Text('Store Logout?'),
         content: const Text('Kya aap Dark Store portal se log out karna chahte hain?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () {
@@ -932,25 +1240,6 @@ class _PartnerProfileScreenState extends State<PartnerProfileScreen> {
                 value: _isStoreOnline,
                 activeTrackColor: AppColors.primary,
                 onChanged: (val) => setState(() => _isStoreOnline = val),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Container(
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
-              child: const Column(
-                children: [
-                  ListTile(
-                    leading: Icon(Icons.location_on_outlined, color: Colors.brown),
-                    title: Text('Operational Dark Store Hub', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    subtitle: Text('Kamalganj Block Center (5.0 KM Boundary)', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                  ),
-                  Divider(height: 1),
-                  ListTile(
-                    leading: Icon(Icons.speed_rounded, color: Colors.amber),
-                    title: Text('Delivery SLA', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    subtitle: Text('11 - 15 Minutes Express Delivery', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                  ),
-                ],
               ),
             ),
             const SizedBox(height: 20),
